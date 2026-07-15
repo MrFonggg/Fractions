@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分數乘法大冒險 - 雙人對戰版</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --panel-bg: rgba(255, 255, 255, 0.1);
+            --p1-color: #e94560;
+            --p2-color: #0f3460;
+            --text-color: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 撐滿全屏的容器 */
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(135deg, #1f4068, #162447, #1a1a2e);
+        }
+
+        /* 開始/說明畫面 */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(10, 10, 25, 0.95);
+            z-index: 10;
+            transition: opacity 0.5s ease;
+        }
+
+        .screen.hidden {
+            display: none !important;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            text-shadow: 0 0 15px rgba(255,255,255,0.5);
+            color: #ffd700;
+        }
+
+        .instructions {
+            max-width: 650px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 15px;
+            font-size: 1.15rem;
+            line-height: 1.8;
+            margin-bottom: 30px;
+            border: 2px solid #ffd700;
+        }
+
+        .start-btns-container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .btn {
+            padding: 15px 35px;
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #fff;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-normal {
+            background: linear-gradient(45deg, #ff416c, #ff4b2b);
+            box-shadow: 0 5px 15px rgba(255, 65, 108, 0.4);
+        }
+
+        .btn-fullscreen {
+            background: linear-gradient(45deg, #00b894, #00cec9);
+            box-shadow: 0 5px 15px rgba(0, 206, 201, 0.4);
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(255, 255, 255, 0.2);
+        }
+
+        /* 頂部工具列 */
+        #header-bar {
+            height: 60px;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 5;
+        }
+
+        .timer-display {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ff4757;
+            text-shadow: 0 0 10px rgba(255, 71, 87, 0.5);
+        }
+
+        .header-btns {
+            display: flex;
+            gap: 10px;
+        }
+
+        .header-btn {
+            padding: 8px 15px;
+            font-size: 0.9rem;
+            background: #4b6584;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+        }
+
+        /* 雙人分屏主要區域 */
+        #main-gameplay {
+            flex: 1;
+            display: flex;
+            position: relative;
+        }
+
+        /* 分割線 */
+        .divider {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            width: 6px;
+            height: 100%;
+            background: linear-gradient(to bottom, #ff416c, #8a2387, #e94560);
+            transform: translateX(-50%);
+            z-index: 2;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+
+        /* 玩家面板 */
+        .player-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #p1-panel {
+            background: linear-gradient(135deg, #1e0010 0%, #0d0d1e 100%);
+        }
+
+        #p2-panel {
+            background: linear-gradient(135deg, #00122e 0%, #0d0d1e 100%);
+        }
+
+        /* 玩家角色與怪獸狀態區 */
+        .battle-arena {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 150px;
+            margin-bottom: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 10px 20px;
+        }
+
+        .entity {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 140px;
+        }
+
+        .entity-avatar {
+            font-size: 3.5rem;
+            margin-bottom: 5px;
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.3));
+        }
+
+        /* 血條與狀態 */
+        .status-bar {
+            width: 100%;
+            background: #2f3542;
+            height: 12px;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .hp-fill {
+            height: 100%;
+            width: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .player-hp-fill { background: #2ed573; }
+        .monster-hp-fill { background: #ff4757; }
+
+        .combo-badge {
+            background: #ffa502;
+            color: black;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            visibility: hidden;
+            margin-top: 5px;
+            animation: bounce 0.5s infinite alternate;
+        }
+
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-5px); }
+        }
+
+        .score-text {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        /* 題目區域 */
+        .question-box {
+            background: rgba(0, 0, 0, 0.4);
+            border: 2px solid;
+            border-radius: 15px;
+            padding: 20px;
+            height: 150px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.2rem;
+            margin-bottom: 20px;
+        }
+
+        #p1-panel .question-box { border-color: #ff416c; }
+        #p2-panel .question-box { border-color: #00bcd4; }
+
+        /* 分數顯示格式化 */
+        .fraction {
+            display: inline-flex;
+            flex-direction: column;
+            vertical-align: middle;
+            text-align: center;
+            padding: 0 5px;
+            font-weight: bold;
+        }
+
+        .fraction .num {
+            border-bottom: 3px solid white;
+            padding-bottom: 2px;
+        }
+
+        .fraction .den {
+            padding-top: 2px;
+        }
+
+        .symbol {
+            margin: 0 10px;
+            align-self: center;
+        }
+
+        .answer-slot {
+            display: inline-block;
+            min-width: 100px;
+            height: 60px;
+            border-bottom: 4px dashed #fff;
+            margin-left: 15px;
+            text-align: center;
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        /* 答案選擇區 (4選1) */
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .option-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            font-size: 1.8rem;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .option-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .option-btn.selected {
+            background: #ffd700 !important;
+            color: black !important;
+            border-color: #ffd700;
+            transform: scale(1.03);
+        }
+
+        /* 提交與取消按鈕 */
+        .action-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 15px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        .btn-cancel {
+            background: #4b6584;
+            color: white;
+        }
+
+        .btn-confirm {
+            background: #2ed573;
+            color: white;
+        }
+
+        /* 動效反饋 */
+        .flash-red {
+            animation: flashRed 0.5s;
+        }
+
+        .flash-green {
+            animation: flashGreen 0.5s;
+        }
+
+        @keyframes flashRed {
+            0%, 100% { background-color: inherit; }
+            50% { background-color: rgba(255, 71, 87, 0.4); }
+        }
+
+        @keyframes flashGreen {
+            0%, 100% { background-color: inherit; }
+            50% { background-color: rgba(46, 213, 115, 0.4); }
+        }
+
+        /* 結算畫面 */
+        #game-over-screen h2 {
+            font-size: 3rem;
+            color: #ffd700;
+            margin-bottom: 20px;
+        }
+
+        .results-box {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 30px;
+        }
+
+        .result-card {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 15px;
+            width: 220px;
+            text-align: center;
+            border: 2px solid;
+        }
+
+        .p1-border { border-color: var(--p1-color); }
+        .p2-border { border-color: var(--p2-color); }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    
+    <!-- 開始畫面 -->
+    <div id="start-screen" class="screen">
+        <h1>⚔️ 分數乘法大冒險 🔮</h1>
+        <div class="instructions">
+            <h3>📜 遊戲規則說明</h3>
+            <ul>
+                <li>本遊戲為 <strong>雙人對戰</strong> 模式，左邊為<b>騎士 (P1)</b>，右邊為<b>法師 (P2)</b>。</li>
+                <li>算出畫面中的分數乘法題目（答案皆可約分或為整數）。</li>
+                <li><b>操作：</b>先點選數字答案，再按「確定」送出。按「取消」可重選。</li>
+                <li>答對可攻擊怪獸，<b>連續答對 3 題以上（Combo）</b>能獲得攻擊力加成！</li>
+                <li>答錯會被怪獸反擊，扣減玩家 HP。擊敗怪獸後會生成新的怪獸。</li>
+                <li>時間限制：<b>90秒</b>，比比看誰能獲得最高分！</li>
+            </ul>
+        </div>
+        <div class="start-btns-container">
+            <button class="btn btn-normal" onclick="startGame(false)">一般開始 ⚔️</button>
+            <button class="btn btn-fullscreen" onclick="startGame(true)">全螢幕遊玩 🖥️</button>
+        </div>
+    </div>
+
+    <!-- 頂部工具列 -->
+    <div id="header-bar">
+        <button class="header-btn" onclick="quitGame()">⬅️ 返回主選單</button>
+        <div id="timer" class="timer-display">90s</div>
+        <div class="header-btns">
+            <button class="header-btn" onclick="toggleFullScreen()">🖥️ 切換全螢幕</button>
+        </div>
+    </div>
+
+    <!-- 主要對戰區 -->
+    <div id="main-gameplay">
+        <div class="divider"></div>
+
+        <!-- 玩家 1 面板 (騎士) -->
+        <div id="p1-panel" class="player-panel">
+            <div class="battle-arena">
+                <div class="entity">
+                    <span class="entity-avatar">🛡️</span>
+                    <span style="font-weight: bold; color: #ff7675;">P1 騎士</span>
+                    <div class="status-bar">
+                        <div id="p1-hp" class="hp-fill player-hp-fill"></div>
+                    </div>
+                    <span class="score-text">分數: <span id="p1-score">0</span></span>
+                </div>
+                <div style="font-size: 1.5rem; font-weight: bold;">VS</div>
+                <div class="entity">
+                    <span id="p1-monster-avatar" class="entity-avatar">👾</span>
+                    <span style="font-weight: bold; color: #ff7675;">怪獸 HP</span>
+                    <div class="status-bar">
+                        <div id="p1-monster-hp" class="hp-fill monster-hp-fill"></div>
+                    </div>
+                    <div id="p1-combo" class="combo-badge">Combo 0</div>
+                </div>
+            </div>
+            
+            <div id="p1-question" class="question-box">
+                <!-- 動態插入分數題目 -->
+            </div>
+
+            <div class="options-grid">
+                <button class="option-btn" onclick="selectOption(1, 0)"></button>
+                <button class="option-btn" onclick="selectOption(1, 1)"></button>
+                <button class="option-btn" onclick="selectOption(1, 2)"></button>
+                <button class="option-btn" onclick="selectOption(1, 3)"></button>
+            </div>
+
+            <div class="action-row">
+                <button class="action-btn btn-cancel" onclick="cancelSelection(1)">取消</button>
+                <button class="action-btn btn-confirm" onclick="submitAnswer(1)">確定</button>
+            </div>
+        </div>
+
+        <!-- 玩家 2 面板 (法師) -->
+        <div id="p2-panel" class="player-panel">
+            <div class="battle-arena">
+                <div class="entity">
+                    <span class="entity-avatar">🔮</span>
+                    <span style="font-weight: bold; color: #74b9ff;">P2 法師</span>
+                    <div class="status-bar">
+                        <div id="p2-hp" class="hp-fill player-hp-fill"></div>
+                    </div>
+                    <span class="score-text">分數: <span id="p2-score">0</span></span>
+                </div>
+                <div style="font-size: 1.5rem; font-weight: bold;">VS</div>
+                <div class="entity">
+                    <span id="p2-monster-avatar" class="entity-avatar">🐉</span>
+                    <span style="font-weight: bold; color: #74b9ff;">怪獸 HP</span>
+                    <div class="status-bar">
+                        <div id="p2-monster-hp" class="hp-fill monster-hp-fill"></div>
+                    </div>
+                    <div id="p2-combo" class="combo-badge">Combo 0</div>
+                </div>
+            </div>
+
+            <div id="p2-question" class="question-box">
+                <!-- 動態插入分數題目 -->
+            </div>
+
+            <div class="options-grid">
+                <button class="option-btn" onclick="selectOption(2, 0)"></button>
+                <button class="option-btn" onclick="selectOption(2, 1)"></button>
+                <button class="option-btn" onclick="selectOption(2, 2)"></button>
+                <button class="option-btn" onclick="selectOption(2, 3)"></button>
+            </div>
+
+            <div class="action-row">
+                <button class="action-btn btn-cancel" onclick="cancelSelection(2)">取消</button>
+                <button class="action-btn btn-confirm" onclick="submitAnswer(2)">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 遊戲結束結算畫面 -->
+    <div id="game-over-screen" class="screen hidden">
+        <h2>🏆 戰鬥結束 🏆</h2>
+        <div class="results-box">
+            <div class="result-card p1-border">
+                <h3 style="color: #ff7675;">P1 騎士</h3>
+                <p style="font-size: 2rem; margin: 15px 0;" id="end-p1-score">0 分</p>
+                <p id="end-p1-status">狀態良好</p>
+            </div>
+            <div class="result-card p2-border">
+                <h3 style="color: #74b9ff;">P2 法師</h3>
+                <p style="font-size: 2rem; margin: 15px 0;" id="end-p2-score">0 分</p>
+                <p id="end-p2-status">狀態良好</p>
+            </div>
+        </div>
+        <h3 id="winner-announcement" style="font-size: 2rem; color: #ffd700; margin-bottom: 30px;"></h3>
+        <button class="btn btn-normal" onclick="quitGame()">回到主目錄</button>
+    </div>
+
+</div>
+
+<script>
+    // 遊戲狀態變量
+    let timerInterval;
+    let timeLeft = 90;
+    let gameActive = false;
+
+    // 怪獸外觀池
+    const monsterEmojis = ['👾', '🐉', '👹', '🧛', '👻', '🦁', '🦂', '🦖'];
+
+    // 玩家數據模型
+    const players = {
+        1: {
+            hp: 100,
+            score: 0,
+            combo: 0,
+            monsterHp: 100,
+            currentQuestion: null,
+            selectedAnswer: null,
+            selectedIndex: null
+        },
+        2: {
+            hp: 100,
+            score: 0,
+            combo: 0,
+            monsterHp: 100,
+            currentQuestion: null,
+            selectedAnswer: null,
+            selectedIndex: null
+        }
+    };
+
+    // 啟動與退出
+    function startGame(goFullScreen) {
+        if (goFullScreen) {
+            enterFullScreen();
+        }
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        resetGameData();
+        gameActive = true;
+        generateNewQuestion(1);
+        generateNewQuestion(2);
+        startTimer();
+    }
+
+    function quitGame() {
+        clearInterval(timerInterval);
+        gameActive = false;
+        document.getElementById('start-screen').classList.remove('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        }
+    }
+
+    function resetGameData() {
+        timeLeft = 90;
+        document.getElementById('timer').innerText = timeLeft + 's';
+        
+        for (let p of [1, 2]) {
+            players[p].hp = 100;
+            players[p].score = 0;
+            players[p].combo = 0;
+            players[p].monsterHp = 100;
+            players[p].selectedAnswer = null;
+            players[p].selectedIndex = null;
+            updateUI(p);
+        }
+    }
+
+    // 計時器邏輯
+    function startTimer() {
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer').innerText = timeLeft + 's';
+            if (timeLeft <= 0) {
+                endGame();
+            }
+        }, 1000);
+    }
+
+    // 產生適合小五心算且能約分的分數乘法題目
+    function generateFractionQuestion() {
+        const type = Math.random() > 0.5 ? 1 : 2;
+
+        if (type === 1) {
+            const den = [2, 3, 4, 5, 6, 8, 10][Math.floor(Math.random() * 7)];
+            const num = Math.floor(Math.random() * (den - 1)) + 1; 
+            const multiplier = den * (Math.floor(Math.random() * 5) + 1); 
+            const rawAns = (multiplier * num) / den;
+            
+            return {
+                type: 1,
+                display: `<span>${multiplier}</span><span class="symbol">×</span><div class="fraction"><span class="num">${num}</span><span class="den">${den}</span></div>`,
+                ansDisplay: rawAns.toString(),
+                answer: rawAns
+            };
+        } else {
+            const common = [2, 3, 4, 5, 6][Math.floor(Math.random() * 5)];
+            const num1 = Math.floor(Math.random() * (common - 1)) + 1;
+            const den1 = common;
+            const num2 = common;
+            const den2 = [3, 4, 5, 8, 10].filter(d => d > num1)[Math.floor(Math.random() * 3)] || 12;
+
+            const finalNum = num1;
+            const finalDen = den2;
+            
+            const gcd = (x, y) => y ? gcd(y, x % y) : x;
+            const g = gcd(finalNum, finalDen);
+            const displayAns = (finalNum/g) === (finalDen/g) ? "1" : `<div class="fraction"><span class="num">${finalNum/g}</span><span class="den">${finalDen/g}</span></div>`;
+
+            return {
+                type: 2,
+                display: `<div class="fraction"><span class="num">${num1}</span><span class="den">${den1}</span></div><span class="symbol">×</span><div class="fraction"><span class="num">${num2}</span><span class="den">${den2}</span></div>`,
+                ansDisplay: displayAns,
+                answer: finalNum / finalDen 
+            };
+        }
+    }
+
+    // 產生題目與干擾項
+    function generateNewQuestion(playerNum) {
+        const p = players[playerNum];
+        p.selectedAnswer = null;
+        p.selectedIndex = null;
+
+        const q = generateFractionQuestion();
+        p.currentQuestion = q;
+
+        const optionsSet = new Set();
+        optionsSet.add(q.ansDisplay); 
+
+        while (optionsSet.size < 4) {
+            const fakeQ = generateFractionQuestion();
+            optionsSet.add(fakeQ.ansDisplay);
+        }
+
+        const optionsArray = Array.from(optionsSet);
+        optionsArray.sort(() => Math.random() - 0.5);
+
+        renderQuestionText(playerNum, "______");
+
+        const panel = document.getElementById(`p${playerNum}-panel`);
+        const optButtons = panel.querySelectorAll('.option-btn');
+        optButtons.forEach((btn, index) => {
+            btn.innerHTML = optionsArray[index];
+            btn.classList.remove('selected');
+            btn.dataset.index = index;
+        });
+    }
+
+    function renderQuestionText(playerNum, fillText) {
+        const q = players[playerNum].currentQuestion;
+        const qBox = document.getElementById(`p${playerNum}-question`);
+        qBox.innerHTML = `${q.display}<span class="symbol">=</span><span class="answer-slot" id="p${playerNum}-slot">${fillText}</span>`;
+    }
+
+    // 選擇答案
+    function selectOption(playerNum, optIndex) {
+        if (!gameActive) return;
+        const p = players[playerNum];
+        p.selectedIndex = optIndex;
+
+        const panel = document.getElementById(`p${playerNum}-panel`);
+        const optButtons = panel.querySelectorAll('.option-btn');
+        
+        optButtons.forEach((btn, idx) => {
+            if (idx === optIndex) {
+                btn.classList.add('selected');
+                p.selectedAnswer = btn.innerHTML; 
+            } else {
+                btn.classList.remove('selected');
+            }
+        });
+
+        renderQuestionText(playerNum, p.selectedAnswer);
+    }
+
+    // 取消選擇
+    function cancelSelection(playerNum) {
+        if (!gameActive) return;
+        const p = players[playerNum];
+        p.selectedAnswer = null;
+        p.selectedIndex = null;
+
+        const panel = document.getElementById(`p${playerNum}-panel`);
+        const optButtons = panel.querySelectorAll('.option-btn');
+        optButtons.forEach(btn => btn.classList.remove('selected'));
+
+        renderQuestionText(playerNum, "______");
+    }
+
+    // 確定送出答案
+    function submitAnswer(playerNum) {
+        if (!gameActive) return;
+        const p = players[playerNum];
+        if (p.selectedAnswer === null) {
+            alert(`請玩家 ${playerNum} 先選擇一個答案！`);
+            return;
+        }
+
+        const isCorrect = (p.selectedAnswer === p.currentQuestion.ansDisplay);
+        const panel = document.getElementById(`p${playerNum}-panel`);
+
+        if (isCorrect) {
+            p.combo++;
+            const damage = p.combo >= 3 ? 40 : 20;
+            p.score += (10 * (p.combo >= 3 ? 2 : 1));
+            p.monsterHp -= damage;
+
+            panel.classList.add('flash-green');
+            setTimeout(() => panel.classList.remove('flash-green'), 500);
+
+            if (p.monsterHp <= 0) {
+                p.monsterHp = 100;
+                document.getElementById(`p${playerNum}-monster-avatar`).innerText = monsterEmojis[Math.floor(Math.random() * monsterEmojis.length)];
+                p.score += 50; 
+            }
+        } else {
+            p.combo = 0;
+            p.hp -= 15; 
+
+            panel.classList.add('flash-red');
+            setTimeout(() => panel.classList.remove('flash-red'), 500);
+
+            if (p.hp <= 0) {
+                p.hp = 100; 
+                p.score = Math.max(0, p.score - 30);
+            }
+        }
+
+        updateUI(playerNum);
+        generateNewQuestion(playerNum);
+    }
+
+    // 更新 UI 資訊
+    function updateUI(playerNum) {
+        const p = players[playerNum];
+        document.getElementById(`p${playerNum}-hp`).style.width = p.hp + '%';
+        document.getElementById(`p${playerNum}-monster-hp`).style.width = p.monsterHp + '%';
+        document.getElementById(`p${playerNum}-score`).innerText = p.score;
+        
+        const comboBadge = document.getElementById(`p${playerNum}-combo`);
+        if (p.combo >= 3) {
+            comboBadge.style.visibility = 'visible';
+            comboBadge.innerText = `🔥 Combo ${p.combo}!`;
+        } else if (p.combo > 0) {
+            comboBadge.style.visibility = 'visible';
+            comboBadge.innerText = `Combo ${p.combo}`;
+        } else {
+            comboBadge.style.visibility = 'hidden';
+        }
+    }
+
+    // 遊戲結束
+    function endGame() {
+        gameActive = false;
+        clearInterval(timerInterval);
+        
+        document.getElementById('end-p1-score').innerText = players[1].score + ' 分';
+        document.getElementById('end-p2-score').innerText = players[2].score + ' 分';
+
+        document.getElementById('end-p1-status').innerText = `剩餘 HP: ${players[1].hp}%`;
+        document.getElementById('end-p2-status').innerText = `剩餘 HP: ${players[2].hp}%`;
+
+        let winnerText = "";
+        if (players[1].score > players[2].score) {
+            winnerText = "🎉 恭喜 P1 騎士 獲得勝利！ 🏆";
+        } else if (players[2].score > players[1].score) {
+            winnerText = "🎉 恭喜 P2 法師 獲得勝利！ 🏆";
+        } else {
+            winnerText = "🤝 勢均力敵！雙方打成平手！";
+        }
+
+        document.getElementById('winner-announcement').innerText = winnerText;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+
+    // 進入全螢幕
+    function enterFullScreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.log(`無法切換至全螢幕模式: ${err.message}`);
+            });
+        }
+    }
+
+    // 切換全螢幕 (頂部按鈕用)
+    function toggleFullScreen() {
+        if (!document.fullscreenElement) {
+            enterFullScreen();
+        } else {
+            document.exitFullscreen();
+        }
+    }
+</script>
+
+</body>
+</html>
